@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StatusPedido {
+  PROTOCOLADO
+  EM_ANALISE
+  EM_EXIGENCIA
+  CONCLUIDO
+  CANCELADO
+}
+
+enum Prioridade {
+  BAIXA
+  NORMAL
+  ALTA
+  URGENTE
+}
+
+model TipoPedido {
+  id        String   @id @default(uuid())
+  nome      String   @unique
+  descricao String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  pedidos Pedido[]
+}
+
+model Pedido {
+  id              String   @id @default(uuid())
+  numeroProtocolo String   @unique
+  ano             Int
+  sequencial      Int
+
+  tipoId      String
+  tipo        TipoPedido @relation(fields: [tipoId], references: [id])
+
+  solicitante String
+  descricao   String
+  prioridade  Prioridade   @default(NORMAL)
+  status      StatusPedido @default(PROTOCOLADO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movimentacoes Movimentacao[]
+
+  @@unique([ano, sequencial])
+  @@index([status])
+  @@index([tipoId])
+}
+
+model Movimentacao {
+  id            String        @id @default(uuid())
+  pedidoId      String
+  pedido        Pedido        @relation(fields: [pedidoId], references: [id])
+  estadoOrigem  StatusPedido?
+  estadoDestino StatusPedido
+  criadoEm      DateTime      @default(now())
+
+  @@index([pedidoId])
+}
+
+// Tabela de controle usada para gerar a numeração sequencial (AAAA/NNNNNN)
+// de forma segura sob concorrência, via SELECT FOR UPDATE.
+model ContadorProtocolo {
+  ano          Int @id
+  ultimoNumero Int @default(0)
+}
