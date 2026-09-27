@@ -2,12 +2,12 @@ import {
   Body,
   Controller,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
 } from '@nestjs/common';
+
 import { PedidosService } from './pedidos.service';
 import { CreatePedidoDto } from '../dto/create-pedido.dto';
 import { UpdateStatusDto } from '../dto/update-status.dto';
@@ -28,7 +28,11 @@ export class PedidosController {
     @Query('tipoId') tipoId?: string,
     @Query('busca') busca?: string,
   ) {
-    return this.pedidosService.findAll({ status, tipoId, busca });
+    return this.pedidosService.findAll({
+      status,
+      tipoId,
+      busca,
+    });
   }
 
   @Get(':id')
@@ -37,7 +41,10 @@ export class PedidosController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
-    return this.pedidosService.updateStatus(id, dto.status as StatusPedido);
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateStatusDto,
+  ) {
+    return this.pedidosService.updateStatus(id, dto.status);
   }
 }

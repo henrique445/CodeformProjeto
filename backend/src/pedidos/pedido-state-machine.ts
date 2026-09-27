@@ -1,22 +1,50 @@
 import { StatusPedido } from '../generated/prisma/client';
 
-// Mapa central de transições válidas. Qualquer mudança de status
-// passa por aqui — é a única fonte de verdade sobre o que pode virar o quê.
+/**
+ * Define quais status podem ser usados depois de cada status atual.
+ *
+ * Exemplo:
+ * PROTOCOLADO pode virar EM_ANALISE ou CANCELADO.
+ */
 const TRANSICOES_VALIDAS: Record<StatusPedido, StatusPedido[]> = {
-  PROTOCOLADO: ['EM_ANALISE', 'CANCELADO'],
-  EM_ANALISE: ['EM_EXIGENCIA', 'CONCLUIDO', 'CANCELADO'],
-  EM_EXIGENCIA: ['EM_ANALISE', 'CANCELADO'],
+  PROTOCOLADO: [
+    'EM_ANALISE',
+    'CANCELADO'],
+
+  EM_ANALISE: [
+    'EM_EXIGENCIA',
+    'CONCLUIDO',
+    'CANCELADO',
+  ],
+
+  EM_EXIGENCIA: [
+    'EM_ANALISE',
+    'CANCELADO',
+  ],
+
   CONCLUIDO: [],
+
   CANCELADO: [],
 };
 
+/**
+ * Verifica se uma mudança de status é permitida.
+ */
 export function isTransicaoValida(
-  origem: StatusPedido,
-  destino: StatusPedido,
+  statusAtual: StatusPedido,
+  novoStatus: StatusPedido,
 ): boolean {
-  return TRANSICOES_VALIDAS[origem]?.includes(destino) ?? false;
+  const statusPermitidos = TRANSICOES_VALIDAS[statusAtual];
+
+  return statusPermitidos.includes(novoStatus);
 }
 
-export function getTransicoesPossiveis(origem: StatusPedido): StatusPedido[] {
-  return TRANSICOES_VALIDAS[origem] ?? [];
+/**
+ * Retorna todos os status para os quais o pedido
+ * pode ser alterado a partir do status atual.
+ */
+export function getTransicoesPossiveis(
+  statusAtual: StatusPedido,
+): StatusPedido[] {
+  return TRANSICOES_VALIDAS[statusAtual];
 }

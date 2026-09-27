@@ -15,48 +15,76 @@ describe('PedidosService - concorrência na numeração', () => {
     service = module.get<PedidosService>(PedidosService);
     prisma = module.get<PrismaService>(PrismaService);
 
-    // Garante que existe um tipo de pedido para usar nos testes
-    const tipo = await prisma.tipoPedido.upsert({
-      where: { nome: '__TIPO_TESTE_CONCORRENCIA__' },
+    // Garante que existe um tipo de pedido para os testes.
+    const tipoPedido = await prisma.tipoPedido.upsert({
+      where: {
+        nome: '__TIPO_TESTE_CONCORRENCIA__',
+      },
       update: {},
       create: {
         nome: '__TIPO_TESTE_CONCORRENCIA__',
         descricao: 'Usado apenas em testes automatizados.',
       },
     });
-    tipoId = tipo.id;
+
+    tipoId = tipoPedido.id;
   });
 
   afterAll(async () => {
-    // Limpa os dados criados pelo teste, para não sujar o banco
+    // Remove os dados criados pelos testes.
     await prisma.movimentacao.deleteMany({
-      where: { pedido: { tipoId } },
+      where: {
+        pedido: {
+          tipoId,
+        },
+      },
     });
-    await prisma.pedido.deleteMany({ where: { tipoId } });
-    await prisma.tipoPedido.delete({ where: { id: tipoId } });
+
+    await prisma.pedido.deleteMany({
+      where: {
+        tipoId,
+      },
+    });
+
+    await prisma.tipoPedido.delete({
+      where: {
+        id: tipoId,
+      },
+    });
+
     await prisma.$disconnect();
   });
 
-  it('nao gera numeros de protocolo duplicados sob concorrencia', async () => {
-    const QUANTIDADE = 20;
+  it(
+    'não gera números de protocolo duplicados sob concorrência',
+    async () => {
+      const QUANTIDADE_DE_PEDIDOS = 20;
 
-    // Dispara N criações de pedido "ao mesmo tempo", simulando
-    // múltiplos usuários protocolando pedidos simultaneamente.
-    const promessas = Array.from({ length: QUANTIDADE }, (_, i) =>
-      service.create({
-        tipoId,
-        solicitante: `Solicitante Teste ${i}`,
-        descricao: 'Pedido criado em teste de concorrencia',
-      }),
-    );
+      // Cria vários pedidos simultaneamente,
+      // simulando diferentes usuários protocolando ao mesmo tempo.
+      const promessas = Array.from(
+        { length: QUANTIDADE_DE_PEDIDOS },
+        (_, indice) =>
+          service.create({
+            tipoId,
+            solicitante: `Solicitante Teste ${indice}`,
+            descricao: 'Pedido criado em teste de concorrência.',
+          }),
+      );
 
-    const pedidosCriados = await Promise.all(promessas);
+      const pedidosCriados = await Promise.all(promessas);
 
-    const numerosProtocolo = pedidosCriados.map((p) => p.numeroProtocolo);
-    const numerosUnicos = new Set(numerosProtocolo);
+      // Obtém todos os números de protocolo gerados.
+      const numerosDeProtocolo = pedidosCriados.map(
+        (pedido) => pedido.numeroProtocolo,
+      );
 
-    // Se algum número se repetiu, o Set vai ter menos elementos
-    // que o array original — é isso que o teste verifica.
-    expect(numerosUnicos.size).toBe(QUANTIDADE);
-  }, 15000); // timeout maior, já que são 20 operações reais no banco
+      // Set remove valores duplicados.
+      const numerosUnicos = new Set(numerosDeProtocolo);
+
+      // Todos os pedidos devem possuir um número diferente.
+      expect(numerosUnicos.size).toBe(QUANTIDADE_DE_PEDIDOS);
+    },
+    15000,
+  );
 });
