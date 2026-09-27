@@ -69,12 +69,12 @@ export default function Home() {
             placeholder="Buscar por solicitante ou protocolo..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="flex-1 min-w-[240px] rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="flex-1 min-w-[240px] rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
           />
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
           >
             <option value="">Todos os status</option>
             {Object.entries(STATUS_LABELS).map(([valor, label]) => (
@@ -86,7 +86,7 @@ export default function Home() {
           <select
             value={tipoId}
             onChange={(e) => setTipoId(e.target.value)}
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
           >
             <option value="">Todos os tipos</option>
             {tipos.map((tipo) => (

@@ -62,7 +62,7 @@ export default function NovoPedido() {
               required
               value={tipoId}
               onChange={(e) => setTipoId(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
             >
               <option value="">Selecione...</option>
               {tipos.map((tipo) => (
@@ -83,12 +83,12 @@ export default function NovoPedido() {
               value={solicitante}
               onChange={(e) => setSolicitante(e.target.value)}
               placeholder="Nome completo"
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-zinc-700">
+            <label className="mb-1 block text-sm font-medium text-zinc-700 bg-white text-zinc-900">
               Descrição
             </label>
             <textarea
@@ -97,7 +97,7 @@ export default function NovoPedido() {
               onChange={(e) => setDescricao(e.target.value)}
               rows={4}
               placeholder="Detalhes do pedido..."
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
             />
           </div>
 
@@ -108,7 +108,7 @@ export default function NovoPedido() {
             <select
               value={prioridade}
               onChange={(e) => setPrioridade(e.target.value)}
-              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm bg-white text-zinc-900"
             >
               <option value="BAIXA">Baixa</option>
               <option value="NORMAL">Normal</option>
