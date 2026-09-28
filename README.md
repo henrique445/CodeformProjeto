@@ -1,80 +1,77 @@
 # Sistema de Protocolo de Pedidos — Cartório
 
-Sistema de gestão de pedidos para cartório, com controle de status via máquina de estados, numeração sequencial de protocolo e histórico completo de movimentações.
+Sistema de gestão de pedidos para cartório, com controle de status por máquina de estados, numeração sequencial de protocolo (`AAAA/NNNNNN`) e histórico completo de movimentações.
 
 Desenvolvido como desafio técnico para a Codeform Tecnologia.
 
-## Stack utilizada
+## Stack
 
 - **Backend:** NestJS + TypeScript
 - **ORM:** Prisma ORM 7 (com driver adapter `@prisma/adapter-pg`)
-- **Banco de dados:** PostgreSQL 18
+- **Banco de dados:** PostgreSQL 18, via Docker Compose
 - **Frontend:** Next.js 16 (App Router) + Tailwind CSS
 - **Testes:** Jest
 
 ## Pré-requisitos
 
-- Node.js 24 (ou superior)
-- PostgreSQL 18 (ou superior) instalado e rodando localmente
+- Node.js 24 ou superior
+- Docker Desktop (para o PostgreSQL)
 - npm
 
-## Setup do zero
+## Setup
 
-### 1. Clonar o repositório
+Da raiz do repositório, em ordem:
 
 ```bash
 git clone https://github.com/henrique445/CodeformProjeto.git
 cd CodeformProjeto
 ```
 
-### 2. Criar o banco de dados
-
-Com o PostgreSQL rodando, crie o banco:
+### 1. Subir o banco de dados
 
 ```bash
-psql -U postgres
+docker compose up -d
+docker compose ps
 ```
 
-```sql
-CREATE DATABASE codeform_cartorio;
-\q
-```
+O `ps` deve mostrar o serviço `db` como `running`. O banco fica exposto na porta **5433** do host (a 5432 é deixada livre para quem já tem um PostgreSQL local) e os dados persistem em um volume Docker.
 
-### 3. Configurar e subir o backend
+### 2. Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Crie o arquivo `backend/.env` com o seguinte conteúdo (ajuste usuário/senha/porta conforme sua instalação local do PostgreSQL):
-
-```
-DATABASE_URL="postgresql://postgres:SUA_SENHA@localhost:5432/codeform_cartorio?schema=public"
-PORT=3333
-```
-
-Rode as migrations (isso cria todas as tabelas):
+Crie o `.env` a partir do exemplo (já vem com os valores do `docker-compose.yml`):
 
 ```bash
+# Linux / macOS / Git Bash
+cp .env.example .env
+
+# Windows PowerShell
+Copy-Item .env.example .env
+```
+
+Gere o client do Prisma, crie as tabelas e popule o banco:
+
+```bash
+npx prisma generate
 npx prisma migrate dev
-```
-
-Popule o banco com os tipos de pedido iniciais:
-
-```bash
 npx prisma db seed
 ```
 
-Suba o servidor:
+O seed cria os 8 tipos de pedido e **um pedido de exemplo** (`AAAA/000001`, em análise, com histórico), para o sistema abrir com dados. Ele só cria o exemplo se o banco não tiver nenhum pedido, então rodar o seed de novo não duplica nada.
+
+Suba a API:
 
 ```bash
 npm run start:dev
 ```
 
-A API estará disponível em `http://localhost:3333`.
+API em `http://localhost:3333`.
 
-### 4. Configurar e subir o frontend
+### 3. Frontend
 
 Em outro terminal:
 
@@ -83,78 +80,101 @@ cd frontend
 npm install
 ```
 
-Crie o arquivo `frontend/.env.local`:
+Crie o `.env.local` a partir do exemplo:
 
-```
-NEXT_PUBLIC_API_URL=http://localhost:3333
-```
+```bash
+# Linux / macOS / Git Bash
+cp .env.example .env.local
 
-Suba o frontend:
+# Windows PowerShell
+Copy-Item .env.example .env.local
+```
 
 ```bash
 npm run dev
 ```
 
-A aplicação estará disponível em `http://localhost:3000`.
+Aplicação em `http://localhost:3000`.
 
-### 5. Rodar os testes automatizados
+### 4. Testes automatizados
 
-Com o PostgreSQL rodando (os testes de integração e concorrência usam o banco real, não mocks):
+Com o banco no ar:
 
 ```bash
 cd backend
 npm run test
 ```
 
-## Endpoints da API
+São 18 testes: máquina de estados, concorrência na numeração e fluxo de integração do CRUD. Os testes de integração e de concorrência usam o banco real, sem mocks. Eles criam e removem os próprios dados, mas **consomem números de protocolo**: a numeração não é reaproveitada, como em um protocolo real. Depois de rodar os testes, o próximo pedido criado pela interface terá um número mais alto.
+
+### Comandos úteis do banco
+
+```bash
+docker compose down        # para o banco, mantém os dados
+docker compose up -d       # sobe de novo, dados preservados
+docker compose down -v     # apaga o banco e os dados (recomeça do zero)
+```
+
+Depois de um `down -v`, repita `npx prisma migrate dev` e `npx prisma db seed`.
+
+As credenciais do `docker-compose.yml` (`postgres` / `1234`) são apenas para desenvolvimento local.
+
+## API
 
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/pedidos` | Cria um novo pedido |
+| `POST` | `/pedidos` | Cria um pedido |
 | `GET` | `/pedidos` | Lista pedidos (filtros: `?status=`, `?tipoId=`, `?busca=`) |
-| `GET` | `/pedidos/:id` | Detalhe de um pedido, com tipo e histórico de movimentações |
-| `PATCH` | `/pedidos/:id/status` | Atualiza o status do pedido (valida a transição) |
-| `GET` | `/tipos-pedido` | Lista os tipos de pedido cadastrados |
+| `GET` | `/pedidos/:id` | Detalhe, com tipo e histórico de movimentações |
+| `PATCH` | `/pedidos/:id/status` | Atualiza o status (valida a transição) |
+| `GET` | `/tipos-pedido` | Lista os tipos de pedido |
 
 ## Máquina de estados
 
-```
-PROTOCOLADO → EM_ANALISE → EM_EXIGENCIA → EM_ANALISE (pode alternar)
-                         ↘ CONCLUIDO (estado final)
-PROTOCOLADO / EM_ANALISE / EM_EXIGENCIA → CANCELADO (estado final)
-```
+| De | Para |
+|---|---|
+| `PROTOCOLADO` | `EM_ANALISE`, `CANCELADO` |
+| `EM_ANALISE` | `EM_EXIGENCIA`, `CONCLUIDO`, `CANCELADO` |
+| `EM_EXIGENCIA` | `EM_ANALISE`, `CANCELADO` |
+| `CONCLUIDO` | — (estado final) |
+| `CANCELADO` | — (estado final) |
 
-Todas as transições são validadas no backend (`src/pedidos/pedido-state-machine.ts`), com uma única fonte de verdade sobre o que pode virar o quê. O frontend espelha esse mapa apenas para decidir quais botões exibir — a validação real acontece sempre no servidor, então uma tentativa de transição inválida é bloqueada mesmo que alguém chame a API diretamente.
+As transições são validadas no backend (`backend/src/pedidos/pedido-state-machine.ts`), que é a única fonte de verdade. O frontend espelha o mapa apenas para decidir quais botões exibir; uma transição inválida é rejeitada com `400` mesmo se alguém chamar a API diretamente. Estados finais são transições vazias de propósito: um pedido concluído ou cancelado não é reaberto.
 
 ## Numeração sequencial (AAAA/NNNNNN)
 
-O maior risco técnico do desafio é gerar números sequenciais sem duplicar sob concorrência (múltiplos usuários protocolando pedidos ao mesmo tempo).
+O maior risco técnico do desafio é gerar números sequenciais sem duplicar sob concorrência.
 
-**Abordagem escolhida:** uma tabela de controle (`ContadorProtocolo`), com uma linha por ano, protegida por `SELECT ... FOR UPDATE` dentro de uma transação. Isso trava a linha do ano corrente até a criação do pedido terminar, garantindo que duas requisições simultâneas nunca leiam o mesmo "último número".
+**Abordagem:** uma tabela de controle (`ContadorProtocolo`) com uma linha por ano, lida com `SELECT ... FOR UPDATE` dentro de uma transação. A linha do ano fica travada até o pedido ser criado, então duas requisições simultâneas nunca leem o mesmo "último número". A criação do pedido e do primeiro registro de histórico acontecem na mesma transação.
 
-Essa abordagem foi validada com um teste automatizado que dispara 20 criações de pedido em paralelo (`src/pedidos/pedidos.concorrencia.spec.ts`) e confirma que todos os números gerados são únicos.
+Isso é validado por um teste automatizado que dispara 20 criações em paralelo (`backend/src/pedidos/pedidos.concorrencia.spec.ts`) e confirma que todos os números são únicos.
 
-**Alternativa considerada:** `SEQUENCE` nativa do PostgreSQL. Foi descartada porque resetar uma sequence automaticamente a cada ano exigiria lógica adicional (trigger ou job agendado), enquanto a tabela de controle resolve o reset por ano de forma natural (uma linha nova por ano, começando do zero).
+**Alternativa descartada:** `SEQUENCE` nativa do PostgreSQL. Resetar uma sequence a cada ano exigiria trigger ou job agendado; a tabela de controle resolve o reset naturalmente (uma linha nova por ano, começando em zero).
 
 ## Decisões de arquitetura
 
-- **Monólito modular, não microsserviços.** Dado o prazo de 2 dias, um monólito bem modularizado (módulos separados para `pedidos`, `tipos-pedido`, `prisma`) entrega o mesmo valor de organização sem o overhead de comunicação entre serviços, deploy múltiplo, etc.
-- **Prisma ORM 7.** Durante o desenvolvimento, o pacote `prisma` no npm passou a apontar por padrão para uma versão 8 ainda em Release Candidate. Foi necessário fixar explicitamente a versão 7 (estável) e configurar um driver adapter (`@prisma/adapter-pg`), que se tornou obrigatório nessa versão do Prisma.
-- **Validação de DTOs com `class-validator`.** Todo dado que entra na API passa por um `ValidationPipe` global, rejeitando campos não esperados (`forbidNonWhitelisted`) e validando tipos/formatos antes de chegar na lógica de negócio.
-- **Histórico de movimentações como tabela própria**, e não como um campo JSON no pedido. Isso permite consultas e ordenação pelo histórico sem parsing manual, e mantém a integridade referencial (uma movimentação não pode existir sem o pedido correspondente).
+- **Monólito modular.** Com prazo curto, módulos separados (`pedidos`, `tipos-pedido`, `prisma`) dão organização sem o custo de operar vários serviços.
+- **Prisma ORM 7.** O pacote `prisma` no npm passou a apontar por padrão para a versão 8, ainda em release candidate, com fluxo diferente. A versão 7 foi fixada de propósito. Nela o driver adapter é obrigatório, e o client é gerado em CommonJS (`moduleFormat = "cjs"`) dentro de `backend/src/generated`, pasta ignorada pelo Git. Por isso o setup exige `npx prisma generate`.
+- **Validação de entrada.** Um `ValidationPipe` global com `class-validator` rejeita campos desconhecidos (`forbidNonWhitelisted`) e valida tipos antes da regra de negócio.
+- **Histórico como tabela própria** (`Movimentacao`), não como JSON no pedido: permite consulta e ordenação diretas e mantém integridade referencial.
+- **Docker apenas para o banco.** O objetivo era um setup reproduzível sem instalar PostgreSQL. Backend e frontend continuam rodando com `npm`, porque containerizar o backend traria a complexidade extra dos binários nativos do Prisma em Linux. A imagem `postgres:18` monta o volume em `/var/lib/postgresql` (o caminho mudou a partir da versão 18).
+- **Seed com pedido de exemplo**, idempotente, que também acerta o contador de protocolo para o próximo pedido não colidir.
 
 ## Trade-offs conhecidos
 
-- Não há autenticação/autorização implementada — fora do escopo definido para este desafio, mas seria o primeiro item de segurança a adicionar antes de um uso real.
-- A listagem de pedidos não tem paginação — aceitável para o volume de dados do desafio, mas precisaria de `LIMIT`/`OFFSET` (ou cursor) em produção.
-- O frontend não tem testes automatizados, apenas o backend. Priorizei testar a lógica de maior risco (máquina de estados e concorrência) dado o tempo disponível.
+- Sem autenticação/autorização; seria o primeiro item de segurança antes de uso real.
+- Listagem sem paginação, aceitável para o volume do desafio.
+- Sem testes automatizados no frontend; priorizei a lógica de maior risco (máquina de estados e concorrência).
+- Os testes compartilham o banco de desenvolvimento e consomem números de protocolo.
+- Os menus dos `<select>` usam o estilo nativo do navegador, que varia entre navegadores.
 
 ## O que eu faria com mais tempo
 
-- Adicionar autenticação (JWT) e controle de permissões por perfil de usuário (atendente, analista, administrador)
-- Paginação e ordenação configurável na listagem de pedidos
-- Dockerizar a aplicação inteira (backend, frontend, PostgreSQL) com `docker-compose`, facilitando a avaliação em qualquer máquina sem precisar instalar PostgreSQL localmente
-- Visualização em Kanban para o frontend, com drag-and-drop entre colunas de status
-- Endpoint de IA para sugerir automaticamente o tipo de pedido a partir da descrição em texto livre
-- Testes automatizados no frontend (React Testing Library)
-- Uso de Redis para cache da listagem de tipos de pedido (dado que muda raramente) e/ou rate limiting nas rotas de criação
+- Autenticação (JWT) e permissões por perfil (atendente, analista, administrador)
+- Paginação e ordenação configurável
+- Banco separado para os testes, para não consumir a numeração de desenvolvimento
+- Dockerizar backend e frontend, com um único `docker compose up` para tudo
+- Visão Kanban com arrastar e soltar entre colunas de status
+- Endpoint de IA para sugerir o tipo de pedido a partir da descrição
+- Testes automatizados no frontend
+- Redis para cache da lista de tipos de pedido e rate limiting na criação
